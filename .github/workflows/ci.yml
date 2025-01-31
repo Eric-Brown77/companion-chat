@@ -1,0 +1,67 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: 'client/package-lock.json'
+
+    - name: Install Dependencies
+      working-directory: ./client
+      run: npm ci
+
+    - name: Lint Check
+      working-directory: ./client
+      run: npm run lint
+
+    - name: Run Tests
+      working-directory: ./client
+      run: npm test
+
+    - name: Build
+      working-directory: ./client
+      run: npm run build
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: build
+        path: client/dist
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Download Build Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: build
+        path: client/dist
+
+    # 这里可以添加你的部署步骤
+    # 例如部署到 GitHub Pages:
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./client/dist
