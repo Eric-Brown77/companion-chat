@@ -19,8 +19,9 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        cache-dependency-path: './client/package-lock.json'
+    
+    - name: List directory contents
+      run: ls -la
     
     - name: Install Dependencies
       run: |
