@@ -22,22 +22,22 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        # cache-dependency-path: 'client/package-lock.json'  # 删除这一行
+        # cache-dependency-path: 'client/package-lock.json'  # 或者使用绝对路径：'${{ github.workspace }}/client/package-lock.json'
 
     - name: Install Dependencies
-      working-directory: ./client
+      working-directory: ${{ github.workspace }}/client
       run: npm ci
 
     - name: Lint Check
-      working-directory: ./client
+      working-directory: ${{ github.workspace }}/client
       run: npm run lint
 
     - name: Run Tests
-      working-directory: ./client
+      working-directory: ${{ github.workspace }}/client
       run: npm test
 
     - name: Build
-      working-directory: ./client
+      working-directory: ${{ github.workspace }}/client
       run: npm run build
 
     - name: Upload Build Artifact
