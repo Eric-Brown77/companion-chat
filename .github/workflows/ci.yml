@@ -20,34 +20,23 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     
-    - name: List directory contents
-      run: ls -la
-    
     - name: Install Dependencies
-      run: |
-        cd client
-        npm ci
+      run: npm ci
     
     - name: Lint Check
-      run: |
-        cd client
-        npm run lint
+      run: npm run lint
     
     - name: Run Tests
-      run: |
-        cd client
-        npm test
+      run: npm test
     
     - name: Build
-      run: |
-        cd client
-        npm run build
+      run: npm run build
     
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: build
-        path: client/dist
+        path: dist
 
   deploy:
     needs: build-and-test
@@ -60,10 +49,10 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: build
-        path: client/dist
+        path: dist
     
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./client/dist
+        publish_dir: ./dist
