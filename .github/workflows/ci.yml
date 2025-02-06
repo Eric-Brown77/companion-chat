@@ -22,7 +22,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: 'client/package-lock.json'
+        # cache-dependency-path: 'client/package-lock.json'  # 删除这一行
 
     - name: Install Dependencies
       working-directory: ./client
@@ -41,7 +41,7 @@ jobs:
       run: npm run build
 
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v4  # 正确：只保留 v4
+      uses: actions/upload-artifact@v4
       with:
         name: build
         path: client/dist
@@ -53,7 +53,7 @@ jobs:
 
     steps:
     - name: Download Build Artifact
-      uses: actions/download-artifact@v4  # 正确：只保留 v4
+      uses: actions/download-artifact@v4
       with:
         name: build
         path: client/dist
@@ -61,7 +61,7 @@ jobs:
     # 这里可以添加你的部署步骤
     # 例如部署到 GitHub Pages:
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4 # 正确：只保留 v4
+      uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./client/dist
