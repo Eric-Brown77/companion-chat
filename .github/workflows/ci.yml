@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        path: .  # 将仓库克隆到当前目录（仓库根目录）
 
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
