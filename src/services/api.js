@@ -64,9 +64,12 @@ const apiService = {
   friends: {
     getFriendList: () => api.get('/friends'),
     sendRequest: (userId) => api.post('/friends/request', { userId }),
-    acceptRequest: (requestId) => api.post('/friends/accept', { requestId }),
-    rejectRequest: (requestId) => api.post('/friends/reject', { requestId }),
-    removeFriend: (friendId) => api.delete(`/friends/${friendId}`)
+    // 修改这些路径以匹配服务器端
+    acceptRequest: (requestId) => api.post(`/friends/accept/${requestId}`),
+    rejectRequest: (requestId) => api.post(`/friends/reject/${requestId}`),
+    removeFriend: (friendId) => api.delete(`/friends/${friendId}`),
+    // 添加获取好友请求列表的方法
+    getRequests: () => api.get('/friends/requests')
   },
 
   // 背包相关

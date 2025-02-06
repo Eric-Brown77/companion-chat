@@ -1,290 +1,156 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { clearUser, setUser } from '../store/slices/authSlice';
 import Header from '../components/layout/Header';
-import Sidebar from '../components/layout/Sidebar';
-import ChatBubble from '../components/chat/ChatBubble';
-import ChatInput from '../components/chat/ChatInput';
+import Character from '../components/game/Character';
 
 const Game = () => {
   const navigate = useNavigate();
-  const gameRef = useRef(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [user, setUser] = useState(null);
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const [players, setPlayers] = useState(new Map());
-  const [chatBubbles, setChatBubbles] = useState(new Map());
-  const [wsConnection, setWsConnection] = useState(null);
+  const [position, setPosition] = useState(user?.position || { x: 0, y: 0 });
+  const [pressedKeys, setPressedKeys] = useState(new Set());
 
-  // 初始化游戏和WebSocket连接
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
+  // 更新位置的函数
+  const updatePosition = useCallback(() => {
+    if (pressedKeys.size === 0) return;
+
+    const moveSpeed = 5; // 降低单次移动速度，但通过requestAnimationFrame提高更新频率
+    let deltaX = 0;
+    let deltaY = 0;
+
+    // 同时处理多个按键
+    if (pressedKeys.has('ArrowUp') || pressedKeys.has('w')) deltaY -= moveSpeed;
+    if (pressedKeys.has('ArrowDown') || pressedKeys.has('s')) deltaY += moveSpeed;
+    if (pressedKeys.has('ArrowLeft') || pressedKeys.has('a')) deltaX -= moveSpeed;
+    if (pressedKeys.has('ArrowRight') || pressedKeys.has('d')) deltaX += moveSpeed;
+
+    // 如果是斜向移动，调整速度以保持一致的移动速度
+    if (deltaX !== 0 && deltaY !== 0) {
+      deltaX *= 0.707; // Math.sqrt(2)/2
+      deltaY *= 0.707;
     }
 
-    const storedUser = JSON.parse(localStorage.getItem('user'));
-    setUser(storedUser);
+    const newPosition = {
+      x: position.x + deltaX,
+      y: position.y + deltaY
+    };
 
-    // 建立WebSocket连接
-    const ws = new WebSocket(`ws://localhost:5000?token=${token}`);
+    setPosition(newPosition);
     
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      setWsConnection(ws);
+    // 更新用户状态
+    const updatedUser = {
+      ...user,
+      position: newPosition
+    };
+    dispatch(setUser(updatedUser));
+  }, [position, pressedKeys, user, dispatch]);
+
+  // 使用 requestAnimationFrame 进行平滑更新
+  useEffect(() => {
+    let animationFrameId;
+    
+    const animate = () => {
+      updatePosition();
+      animationFrameId = requestAnimationFrame(animate);
     };
 
-    ws.onmessage = handleWebSocketMessage;
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
+    if (pressedKeys.size > 0) {
+      animationFrameId = requestAnimationFrame(animate);
+    }
 
     return () => {
-      if (ws) ws.close();
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [updatePosition, pressedKeys]);
+
+  // 处理键盘事件
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault(); // 防止页面滚动
+        setPressedKeys(prev => new Set(prev).add(key));
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      const key = e.key.toLowerCase();
+      setPressedKeys(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
 
-  // 处理WebSocket消息
-  const handleWebSocketMessage = (event) => {
-    const message = JSON.parse(event.data);
-
-    switch (message.type) {
-      case 'player_join':
-        handlePlayerJoin(message.player);
-        break;
-      case 'player_leave':
-        handlePlayerLeave(message.playerId);
-        break;
-      case 'chat_bubble':
-        handleChatBubble(message);
-        break;
-      case 'player_move':
-        handlePlayerMove(message);
-        break;
-      default:
-        console.log('Unknown message type:', message.type);
-    }
+  const handleLogout = () => {
+    dispatch(clearUser());
+    localStorage.clear();
+    navigate('/login');
   };
 
-  // 处理玩家加入
-  const handlePlayerJoin = (player) => {
-    setPlayers(prev => new Map(prev).set(player.id, player));
-  };
-
-  // 处理玩家离开
-  const handlePlayerLeave = (playerId) => {
-    setPlayers(prev => {
-      const newPlayers = new Map(prev);
-      newPlayers.delete(playerId);
-      return newPlayers;
-    });
-  };
-
-  // 处理聊天气泡
-  const handleChatBubble = (message) => {
-    const bubbleId = Date.now();
-    setChatBubbles(prev => new Map(prev).set(bubbleId, {
-      playerId: message.playerId,
-      content: message.content,
-      position: message.position
-    }));
-
-    // 5秒后移除气泡
-    setTimeout(() => {
-      setChatBubbles(prev => {
-        const newBubbles = new Map(prev);
-        newBubbles.delete(bubbleId);
-        return newBubbles;
-      });
-    }, 5000);
-  };
-
-  // 处理玩家移动
-  const handlePlayerMove = (message) => {
-    setPlayers(prev => {
-      const newPlayers = new Map(prev);
-      const player = newPlayers.get(message.playerId);
-      if (player) {
-        player.position = message.position;
-        newPlayers.set(message.playerId, { ...player });
-      }
-      return newPlayers;
-    });
-  };
-
-  // 发送聊天消息
-  const handleChat = (content) => {
-    if (!wsConnection) return;
-
-    wsConnection.send(JSON.stringify({
-      type: 'chat',
-      content
-    }));
-  };
-
-  // 处理键盘移动
-  useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (!user || !wsConnection) return;
-
-      let deltaX = 0;
-      let deltaY = 0;
-      const moveSpeed = 10;
-
-      switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-          deltaY = -moveSpeed;
-          break;
-        case 'ArrowDown':
-        case 's':
-          deltaY = moveSpeed;
-          break;
-        case 'ArrowLeft':
-        case 'a':
-          deltaX = -moveSpeed;
-          break;
-        case 'ArrowRight':
-        case 'd':
-          deltaX = moveSpeed;
-          break;
-        default:
-          return;
-      }
-
-      const newPosition = {
-        x: user.position.x + deltaX,
-        y: user.position.y + deltaY
-      };
-
-      wsConnection.send(JSON.stringify({
-        type: 'move',
-        position: newPosition
-      }));
-
-      setUser(prev => ({
-        ...prev,
-        position: newPosition
-      }));
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [user, wsConnection]);
+  if (!user) {
+    navigate('/login');
+    return null;
+  }
 
   return (
-    <div className="h-screen flex flex-col">
-      <Header 
-        user={user} 
-        onLogout={() => {
-          localStorage.clear();
-          navigate('/login');
-        }}
-      />
-
-      <div className="flex-1 relative overflow-hidden" ref={gameRef}>
-        {/* 游戏世界 */}
-        <div className="absolute inset-0 bg-gray-100">
-          {/* 渲染其他玩家 */}
-          {Array.from(players.values()).map(player => (
-            <div
-              key={player.id}
-              className="absolute transition-all duration-200"
-              style={{
-                transform: `translate(${player.position.x}px, ${player.position.y}px)`
-              }}
-            >
-              <div className="relative">
-                {/* 玩家角色 */}
-                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
-                  {player.username.charAt(0)}
-                </div>
-                
-                {/* 玩家名称 */}
-                <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap text-sm">
-                  {player.username}
-                </div>
-
-                {/* 聊天气泡 */}
-                {Array.from(chatBubbles.values())
-                  .filter(bubble => bubble.playerId === player.id)
-                  .map((bubble, index) => (
-                    <ChatBubble
-                      key={index}
-                      content={bubble.content}
-                      position={bubble.position}
-                    />
-                  ))
-                }
-              </div>
-            </div>
-          ))}
-
-          {/* 渲染当前玩家 */}
-          {user && (
-            <div
-              className="absolute transition-all duration-200"
-              style={{
-                transform: `translate(${user.position.x}px, ${user.position.y}px)`
-              }}
-            >
-              <div className="relative">
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white">
-                  {user.username.charAt(0)}
-                </div>
-                <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap text-sm">
-                  {user.username}
-                </div>
-              </div>
-            </div>
-          )}
+    <div className="min-h-screen flex flex-col">
+      <Header user={user} onLogout={handleLogout} />
+      
+      {/* 游戏主区域 */}
+      <div className="flex-1 relative bg-gray-100 overflow-hidden">
+        {/* 地图背景 */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-100 to-green-200">
+          {/* 网格背景 */}
+          <div className="absolute inset-0" 
+               style={{
+                 backgroundImage: 'linear-gradient(#ccc 1px, transparent 1px), linear-gradient(90deg, #ccc 1px, transparent 1px)',
+                 backgroundSize: '50px 50px'
+               }}
+          />
         </div>
 
-        {/* 聊天输入框 */}
+        {/* 当前玩家 */}
+        <Character
+          user={user}
+          position={position}
+          isCurrentPlayer={true}
+        />
+
+        {/* 其他玩家 */}
+        {Array.from(players.values()).map(player => (
+          <Character
+            key={player.id}
+            user={player}
+            position={player.position}
+            isCurrentPlayer={false}
+          />
+        ))}
+
+        {/* 调试信息 */}
+        <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white p-2 rounded">
+          位置: ({Math.round(position.x)}, {Math.round(position.y)})
+        </div>
+
+        {/* 聊天输入框占位 */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-96">
-          <ChatInput onSend={handleChat} />
+          {/* TODO: 添加聊天输入组件 */}
         </div>
       </div>
-
-      {/* 侧边栏 */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        friendList={Array.from(players.values())}
-      />
-
-      {/* 侧边栏开关按钮 */}
-      <button
-        className="fixed right-4 top-20 z-50 bg-white p-2 rounded-full shadow-lg"
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-      >
-        <svg
-          className="w-6 h-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          {isSidebarOpen ? (
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          ) : (
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16m-7 6h7"
-            />
-          )}
-        </svg>
-      </button>
     </div>
   );
 };

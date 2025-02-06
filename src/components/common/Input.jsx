@@ -5,31 +5,16 @@ const Input = ({
   label,
   error,
   id,
+  name,
   placeholder,
-  value,
+  value = '',
   onChange,
+  onBlur,
   disabled = false,
   required = false,
   className = '',
   icon
 }) => {
-  // 基础样式
-  const baseInputStyle = `
-    w-full px-4 py-2 rounded-md border
-    focus:outline-none focus:ring-2 focus:ring-offset-2 
-    transition-colors duration-200
-  `;
-
-  // 状态样式
-  const stateStyles = {
-    normal: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500',
-    error: 'border-red-500 focus:border-red-500 focus:ring-red-500',
-    disabled: 'bg-gray-100 text-gray-500 cursor-not-allowed'
-  };
-
-  // 获取当前状态的样式
-  const currentState = disabled ? 'disabled' : error ? 'error' : 'normal';
-
   return (
     <div className="space-y-1">
       {label && (
@@ -54,14 +39,21 @@ const Input = ({
         <input
           type={type}
           id={id}
+          name={name}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
+          onBlur={onBlur}
           disabled={disabled}
           required={required}
           className={`
-            ${baseInputStyle}
-            ${stateStyles[currentState]}
+            w-full px-4 py-2 rounded-md border 
+            focus:outline-none focus:ring-2 focus:ring-offset-2
+            ${error 
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+            }
+            ${disabled ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}
             ${icon ? 'pl-10' : ''}
             ${className}
           `}

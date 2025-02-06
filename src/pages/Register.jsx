@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import apiService from '../services/api';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
-import Loading from '../components/common/Loading';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -12,7 +13,6 @@ const Register = () => {
     password: '',
     confirmPassword: ''
   });
-  const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -21,88 +21,49 @@ const Register = () => {
       ...prev,
       [name]: value
     }));
-    // 清除对应字段的错误
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    
-    // 用户名验证
-    if (!formData.username.trim()) {
-      newErrors.username = '请输入用户名';
-    } else if (formData.username.length < 3) {
-      newErrors.username = '用户名至少3个字符';
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('两次输入的密码不一致');
+      return false;
     }
-
-    // 邮箱验证
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email) {
-      newErrors.email = '请输入邮箱';
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = '请输入有效的邮箱地址';
+    if (formData.password.length < 6) {
+      toast.error('密码至少需要6个字符');
+      return false;
     }
-
-    // 密码验证
-    if (!formData.password) {
-      newErrors.password = '请输入密码';
-    } else if (formData.password.length < 6) {
-      newErrors.password = '密码至少6个字符';
+    if (formData.username.length < 3) {
+      toast.error('用户名至少需要3个字符');
+      return false;
     }
-
-    // 确认密码验证
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = '请确认密码';
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = '两次输入的密码不一致';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     if (!validateForm()) return;
+    
+    setIsLoading(true);
 
     try {
-      setIsLoading(true);
-      
-      // 发送注册请求
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password
-        })
+      const response = await apiService.auth.register({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || '注册失败');
+      if (response.success) {
+        // 保存token和用户信息
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        
+        toast.success('注册成功！');
+        navigate('/game');
       }
-
-      // 保存token和用户信息
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // 跳转到游戏页面
-      navigate('/game');
-      
     } catch (error) {
-      setErrors({
-        form: error.message || '注册失败，请稍后重试'
-      });
+      toast.error(error.message || '注册失败，请稍后重试');
+      console.error('Registration error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -111,80 +72,77 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           创建新账号
         </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          或者{' '}
+          <Link
+            to="/login"
+            className="font-medium text-blue-600 hover:text-blue-500"
+          >
+            登录已有账号
+          </Link>
+        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* 错误提示 */}
-          {errors.form && (
-            <div className="mb-4 bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-              {errors.form}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-6">
             <Input
-              type="text"
-              label="用户名"
               id="username"
               name="username"
+              type="text"
+              label="用户名"
               value={formData.username}
               onChange={handleChange}
-              error={errors.username}
               placeholder="请输入用户名"
               required
             />
 
             <Input
-              type="email"
-              label="邮箱"
               id="email"
               name="email"
+              type="email"
+              label="邮箱"
               value={formData.email}
               onChange={handleChange}
-              error={errors.email}
               placeholder="请输入邮箱"
               required
             />
 
             <Input
-              type="password"
-              label="密码"
               id="password"
               name="password"
+              type="password"
+              label="密码"
               value={formData.password}
               onChange={handleChange}
-              error={errors.password}
               placeholder="请输入密码"
               required
             />
 
             <Input
-              type="password"
-              label="确认密码"
               id="confirmPassword"
               name="confirmPassword"
+              type="password"
+              label="确认密码"
               value={formData.confirmPassword}
               onChange={handleChange}
-              error={errors.confirmPassword}
               placeholder="请再次输入密码"
               required
             />
 
-            <div>
-              <Button
-                type="submit"
-                variant="primary"
-                fullWidth
-                loading={isLoading}
-                disabled={isLoading}
-              >
-                注册
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              variant="primary"
+              fullWidth
+              loading={isLoading}
+              disabled={isLoading || !formData.username || !formData.email || 
+                       !formData.password || !formData.confirmPassword}
+            >
+              注册
+            </Button>
           </form>
 
           <div className="mt-6">
@@ -194,19 +152,31 @@ const Register = () => {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-gray-500">
-                  已有账号？
+                  或者使用以下方式注册
                 </span>
               </div>
             </div>
 
-            <div className="mt-6">
-              <Button
-                variant="secondary"
-                fullWidth
-                onClick={() => navigate('/login')}
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
               >
-                立即登录
-              </Button>
+                <span className="sr-only">Sign up with Google</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+              >
+                <span className="sr-only">Sign up with GitHub</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.386-1.332-1.754-1.332-1.754-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.298 24 12c0-6.627-5.373-12-12-12" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
